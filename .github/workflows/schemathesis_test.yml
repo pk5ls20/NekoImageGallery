@@ -30,7 +30,7 @@ jobs:
           curl -L -o data.zip https://huggingface.co/datasets/animelover/danbooru2022/resolve/main/data/data-0000.zip?download=true
           unzip data.zip -d images > /dev/null 2>&1
           cd images
-          find . -type f ! -name '60137[1-9][7-9].jpg' ! -name '6013[8-9][0-9][0-9].jpg' ! -name '6014[0-6][0-9][0-9].jpg' ! -name '60147[0-1][0-7].jpg' -delete
+          find . -type f \( ! -name '60137[1-7][7-9].jpg' ! -name '601375[0].jpg' \) -exec rm {} +
           cd ..
       - name: Prepare the Index
         run: |
