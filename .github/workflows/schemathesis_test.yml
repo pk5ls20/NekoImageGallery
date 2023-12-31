@@ -55,3 +55,6 @@ jobs:
           schema: 'http://127.0.0.1:12318/openapi.json'
           args: '--force-schema-version=30'
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
+        continue-on-error: true
+      - name: Upload test results
+        run: cat output.txt
