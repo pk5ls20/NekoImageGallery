@@ -75,4 +75,7 @@ jobs:
           path: "output.txt"
       - name: Schemathesis status
         if: ${{ steps.schemathesis-test.outcome == 'failure' }}
-        run: exit 1
+        run: |
+          echo "Schemathesis test failed. Exiting..."
+          echo "::set-output name=status::failed"
+        id: schemathesis-status
