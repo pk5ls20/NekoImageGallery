@@ -44,17 +44,20 @@ jobs:
           python main.py --local-index "images"
       - name: Run the Server
         run: >
-          python main.py
+          python main.py --port 12318 
           2>&1 | tee output.txt &
       - name: Wait for the server to start
         run: |
-          wait-for-it --service 127.0.0.1:8000 -t 600
-      - name: Wait for the server to start
+          wait-for-it --service 127.0.0.1:12318 -t 600
+      - name: wget
         run: |
+          wget http://127.0.0.1:12318/
+          cat index.html
           wget http://127.0.0.1:8000/
+          cat index.html.2
       - name: Run the final schemathesis test
         uses: schemathesis/action@v1
         with:
-          schema: 'http://127.0.0.1:8000/openapi.json'
+          schema: 'http://127.0.0.1:12318/openapi.json'
           args: '--force-schema-version=30'
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
