@@ -53,3 +53,5 @@ jobs:
         uses: schemathesis/action@v1
         with:
           schema: 'http://127.0.0.1:8000/openapi.json'
+          args: '--force-schema-version=30'
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
