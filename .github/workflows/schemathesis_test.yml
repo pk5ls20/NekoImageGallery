@@ -8,7 +8,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  schemathesis-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -21,7 +21,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
       - name: Cache datasets & models
-        uses: actions/cache@v3
+        uses: actions/cache/save@v3
+        if: always()
         with:
           path: |
             /home/runner/work/NekoImageGallery/NekoImageGallery/images
@@ -61,6 +62,7 @@ jobs:
         run: |
           wait-for-it --service 127.0.0.1:8000 -t 600
       - name: Run the final schemathesis test
+        id: schemathesis-test
         uses: schemathesis/action@v1
         with:
           schema: 'http://127.0.0.1:8000/openapi.json'
@@ -76,6 +78,4 @@ jobs:
       - name: Schemathesis status
         if: ${{ steps.schemathesis-test.outcome == 'failure' }}
         run: |
-          echo "Schemathesis test failed. Exiting..."
-          echo "::set-output name=status::failed"
-        id: schemathesis-status
+          exit 1
