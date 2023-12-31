@@ -49,6 +49,9 @@ jobs:
       - name: Wait for the server to start
         run: |
           wait-for-it --service 127.0.0.1:8000 -t 600
+      - name: Wait for the server to start
+        run: |
+          wget http://127.0.0.1:8000/
       - name: Run the final schemathesis test
         uses: schemathesis/action@v1
         with:
