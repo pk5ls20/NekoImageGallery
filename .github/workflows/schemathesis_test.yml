@@ -1,0 +1,87 @@
+name: Schemathesis Test
+
+on:
+  workflow_call:
+  push:
+    branches-ignore:
+      - 'master'
+  pull_request:
+
+jobs:
+  schemathesis-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.10" ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      - name: Cache datasets & models
+        uses: actions/cache@v3
+        with:
+          path: |
+            /home/runner/work/NekoImageGallery/NekoImageGallery/images
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-${{ hashFiles('**/config/default.env') }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install wait-for-it schemathesis -r requirements.txt
+      - name: Download datasets
+        run: >
+            if [ ! -d "/home/runner/work/NekoImageGallery/NekoImageGallery/images" ]; then
+              curl -L -o data.zip "https://huggingface.co/datasets/animelover/danbooru2022/resolve/main/data/data-0000.zip?download=true"
+              unzip data.zip -d images > /dev/null 2>&1
+              cd images
+              find . -type f \( ! -name '60137[1-7][7-9].jpg' ! -name '601375[0].jpg' \) -exec rm {} +
+              cd ..
+            fi
+      - name: Prepare the Index
+        run: |
+          docker pull qdrant/qdrant
+          docker run -p 6333:6333 -p 6334:6334 -d \
+          -v $(pwd)/qdrant_storage:/qdrant/storage:z \
+          qdrant/qdrant
+          python main.py --init-database
+      - name: Run NekoImageGallery Index
+        run: |
+          export APP_ADMIN_API_ENABLE=True
+          export APP_ACCESS_PROTECTED=True
+          python main.py --local-index "images"
+      - name: Run NekoImageGallery Server
+        run: >
+          python main.py
+          2>&1 | tee output.txt &
+      - name: Wait for the NekoImageGallery server to start
+        run: |
+          wait-for-it --service 127.0.0.1:8000 -t 600
+      - name: Run the final schemathesis test
+        id: schemathesis-test
+        uses: schemathesis/action@v1
+        with:
+          schema: 'http://127.0.0.1:8000/openapi.json'
+          args: '--force-schema-version=30'
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
+        continue-on-error: true
+      - name: Upload NekoImageGallery server logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: "server.logs"
+          path: "output.txt"
+      - name: Force cache datasets & models if schemathesis test failed
+        uses: actions/cache/save@v3
+        if: ${{ steps.schemathesis-test.outcome == 'failure' }}
+        with:
+          path: |
+            /home/runner/work/NekoImageGallery/NekoImageGallery/images
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-${{ hashFiles('**/config/default.env') }}
+      - name: throw Schemathesis status
+        if: ${{ steps.schemathesis-test.outcome == 'failure' }}
+        run: |
+          exit 1
