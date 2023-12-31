@@ -41,20 +41,25 @@ jobs:
           python main.py --init-database
       - name: Run the Index
         run: |
+          export APP_ADMIN_API_ENABLE=True
+          export APP_ACCESS_PROTECTED=True
           python main.py --local-index "images"
       - name: Run the Server
         run: >
-          python main.py --port 12318 
+          python main.py
           2>&1 | tee output.txt &
       - name: Wait for the server to start
         run: |
-          wait-for-it --service 127.0.0.1:12318 -t 600
+          wait-for-it --service 127.0.0.1:8000 -t 600
       - name: Run the final schemathesis test
         uses: schemathesis/action@v1
         with:
-          schema: 'http://127.0.0.1:12318/openapi.json'
+          schema: 'http://127.0.0.1:8000/openapi.json'
           args: '--force-schema-version=30'
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
         continue-on-error: true
       - name: Upload test results
         run: cat output.txt
+      - name: curl
+        run: |
+         curl -X GET -H 'x-access-token: [Filtered]' http://127.0.0.1:8000/
