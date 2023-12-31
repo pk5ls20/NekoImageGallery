@@ -21,8 +21,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
       - name: Cache datasets & models
-        uses: actions/cache/save@v3
-        if: always()
+        uses: actions/cache@v3
         with:
           path: |
             /home/runner/work/NekoImageGallery/NekoImageGallery/images
@@ -70,12 +69,19 @@ jobs:
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
         continue-on-error: true
       - name: Upload NekoImageGallery server logs
-        if: ${{ steps.schemathesis-test.outcome == 'failure' }}
         uses: actions/upload-artifact@v3
         with:
-          name: "uvicorn.logs"
+          name: "server.logs"
           path: "output.txt"
-      - name: Schemathesis status
+      - name: Force cache datasets & models if schemathesis test failed
+        uses: actions/cache/save@v3
+        if: ${{ steps.schemathesis-test.outcome == 'failure' }}
+        with:
+          path: |
+            /home/runner/work/NekoImageGallery/NekoImageGallery/images
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-${{ hashFiles('**/config/default.env') }}
+      - name: throw Schemathesis status
         if: ${{ steps.schemathesis-test.outcome == 'failure' }}
         run: |
           exit 1
