@@ -33,7 +33,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install wait-for-it schemathesis -r requirements.txt
+          pip install wait-for-it schemathesis -r requirements.txt --ignore-requires-python
         continue-on-error: true
       - name: Download datasets
         run: >
