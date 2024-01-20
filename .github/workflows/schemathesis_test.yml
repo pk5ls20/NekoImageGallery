@@ -80,7 +80,9 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: "server.logs"
-          path: "output.txt"
+          path: |
+            "output.txt"
+            "readme.md"
         continue-on-error: true
       - name: Force cache datasets & models if schemathesis test failed
         uses: actions/cache/save@v3
@@ -96,5 +98,4 @@ jobs:
         run: |
           echo "Run failed"
           exit 1
-        continue-on-error: true
         
