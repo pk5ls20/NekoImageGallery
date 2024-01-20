@@ -95,4 +95,6 @@ jobs:
         if: ${{ steps.schemathesis-test.outcome == 'failure' }}
         run: |
           echo "Run failed"
+          exit 1
         continue-on-error: true
+        
