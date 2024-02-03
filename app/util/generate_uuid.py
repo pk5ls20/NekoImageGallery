@@ -1,12 +1,14 @@
 import io
+import os
 import pathlib
 import hashlib
 from uuid import UUID, uuid5, NAMESPACE_DNS
 
+Path = os.PathLike
 NAMESPACE_STR = 'github.com/hv0905/NekoImageGallery'
 
 
-def generate(file_input: pathlib.Path | io.BytesIO) -> UUID:
+def generate(file_input: Path | io.BytesIO) -> UUID:
     namespace_uuid = uuid5(NAMESPACE_DNS, NAMESPACE_STR)
     if isinstance(file_input, pathlib.Path):
         with open(file_input, 'rb') as f:

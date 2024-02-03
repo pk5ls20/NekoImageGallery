@@ -6,7 +6,7 @@ from qdrant_client import qdrant_client, models
 def parsing_args():
     parser = argparse.ArgumentParser(description='Create Qdrant collection')
     parser.add_argument('--host', type=str, required=False, default="127.0.0.1", help="Qdrant host")
-    parser.add_argument('--port', type=int, required=False, default=6333, help="Qdrant port")
+    parser.add_argument('--port', type=int, required=False, default=6335, help="Qdrant port")
     parser.add_argument("--name", type=str, required=False, default="NekoImg", help="Collection name")
     return parser.parse_args()
 

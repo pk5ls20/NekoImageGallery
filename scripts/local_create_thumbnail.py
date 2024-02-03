@@ -4,18 +4,17 @@ from pathlib import Path
 from PIL import Image
 from loguru import logger
 
-from app.Services.provider import db_context
+from app.Services.provider import db_context, storage_service
 from app.config import config
-from .local_utility import gather_valid_files
 
 
 async def main():
-    static_path = Path(config.static_file.path)
+    static_path = Path(config.storage.local.path)
     static_thumb_path = static_path / 'thumbnails'
     if not static_thumb_path.exists():
         static_thumb_path.mkdir()
     count = 0
-    for item in gather_valid_files(static_path, '*.*'):
+    async for item in storage_service.list_files(static_path, '*.*'):
         count += 1
         logger.info("[{}] Processing {}", str(count), str(item.relative_to(static_path)))
         size = item.stat().st_size

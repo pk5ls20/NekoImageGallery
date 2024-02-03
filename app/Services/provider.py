@@ -6,6 +6,7 @@ from ..config import config, environment
 transformers_service = TransformersService()
 db_context = VectorDbContext()
 ocr_service = None
+storage_service = None
 
 if environment.local_indexing:
     match config.ocr_search.ocr_module:
@@ -29,3 +30,14 @@ else:
     ocr_service = DisabledOCRService()
 
 index_service = IndexService(ocr_service, transformers_service, db_context)
+
+match config.storage.method:
+    case "local":
+        from .storage.local_storage import LocalStorage
+        storage_service = LocalStorage()
+    case "s3":
+        from .storage.s3_compatible_storage import S3Storage
+        storage_service = S3Storage()
+    case _:
+        raise NotImplementedError(f"Storage method {config.storage.method} not implemented. "
+                                  f"Available methods: local, s3")
