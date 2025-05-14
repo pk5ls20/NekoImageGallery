@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from io import BytesIO
 from pathlib import PurePath
@@ -99,6 +100,11 @@ IMAGE_MIMES = {
 }
 
 
+def verify_image(img_bytes: bytes):
+    with Image.open(BytesIO(img_bytes)) as image:
+        image.verify()
+
+
 @admin_router.post("/upload",
                    description="Upload image to server. The image will be indexed and stored in the database. If "
                                "local is set to true, the image will be uploaded to local storage.")
@@ -117,17 +123,17 @@ async def upload_image(image_file: Annotated[UploadFile, File(description="The i
                        image_file.content_type, image_file.filename)
         raise HTTPException(415, "Unsupported image format.")
     img_bytes = await image_file.read()
+    img_id = services.upload_service.assign_image_id(img_bytes)
     try:
-        img_id = await services.upload_service.assign_image_id(img_bytes)
+        await services.upload_service.try_add_image_id(img_id)
     except PointDuplicateError as ex:
         raise HTTPException(409,
                             f"The uploaded point is already contained in the database! entity id: {ex.entity_id}") \
             from ex
     try:
-        image = Image.open(BytesIO(img_bytes))
-        image.verify()
-        image.close()
+        await asyncio.to_thread(verify_image, img_bytes)
     except UnidentifiedImageError as ex:
+        await services.upload_service.try_remove_image_id(img_id)
         logger.warning("Invalid image file from upload request. id: {}", img_id)
         raise HTTPException(422, "Cannot open the image file.") from ex
 

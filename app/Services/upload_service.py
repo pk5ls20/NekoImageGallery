@@ -2,6 +2,7 @@ import asyncio
 import gc
 import io
 import pathlib
+import uuid
 from io import BytesIO
 
 from PIL import Image
@@ -28,6 +29,7 @@ class UploadService(LifespanService):
         self._upload_worker_task = asyncio.create_task(self._upload_worker())
 
         self.uploading_ids = set()
+        self._uploading_ids_lock = asyncio.Lock()
         self._processed_count = 0
 
     async def _upload_worker(self):
@@ -41,13 +43,22 @@ class UploadService(LifespanService):
                 logger.exception(ex)
             finally:
                 self._queue.task_done()
-                self.uploading_ids.remove(img_data.id)
+                logger.debug("Image {} done. Queue Length: {}", img_data.id, self._queue.qsize())
+                async with self._uploading_ids_lock:
+                    self.uploading_ids.remove(img_data.id)
                 self._processed_count += 1
                 if self._processed_count % 50 == 0:
                     gc.collect()
 
     async def _upload_task(self, mapped_img: MappedImage, img_bytes: bytes, skip_ocr: bool,
                            thumbnail_mode: UploadImageThumbnailMode):
+
+        def thumb_generate(image: Image) -> io.BytesIO:
+            image.thumbnail((256, 256), resample=Image.Resampling.LANCZOS)
+            byte_arr = BytesIO()
+            image.save(byte_arr, 'WebP', save_all=True)
+            return byte_arr
+
         img = Image.open(BytesIO(img_bytes))
         logger.info('Start indexing image {}. Local: {}. Size: {}', mapped_img.id, mapped_img.local, len(img_bytes))
         file_name = f"{mapped_img.id}.{mapped_img.format}"
@@ -71,9 +82,7 @@ class UploadService(LifespanService):
             logger.success("Image {} uploaded to local storage.", mapped_img.id)
         if gen_thumb:
             logger.info("Start generate and upload thumbnail for {}.", mapped_img.id)
-            img.thumbnail((256, 256), resample=Image.Resampling.LANCZOS)
-            img_byte_arr = BytesIO()
-            img.save(img_byte_arr, 'WebP', save_all=True)
+            img_byte_arr = await asyncio.to_thread(thumb_generate, img)
             await self._storage_service.active_storage.upload(img_byte_arr.getvalue(), thumb_path)
             logger.success("Thumbnail for {} generated and uploaded!", mapped_img.id)
 
@@ -81,18 +90,29 @@ class UploadService(LifespanService):
 
     async def queue_upload_image(self, mapped_img: MappedImage, img_bytes: bytes, skip_ocr: bool,
                                  thumbnail_mode: UploadImageThumbnailMode):
-        self.uploading_ids.add(mapped_img.id)
         await self._queue.put((mapped_img, img_bytes, skip_ocr, thumbnail_mode))
         logger.success("Image {} added to upload queue. Queue Length: {} [+1]", mapped_img.id, self._queue.qsize())
 
-    async def assign_image_id(self, img_file: pathlib.Path | io.BytesIO | bytes):
-        img_id = generate_uuid(img_file)
+    @staticmethod
+    def assign_image_id(img_file: pathlib.Path | io.BytesIO | bytes):
+        return generate_uuid(img_file)
+
+    async def try_add_image_id(self, img_id: uuid.UUID):
         # check for duplicate points
-        if img_id in self.uploading_ids or len(await self._db_context.validate_ids([str(img_id)])) != 0:
-            logger.warning("Duplicate upload request for image id: {}", img_id)
-            raise PointDuplicateError(f"The uploaded point is already contained in the database! entity id: {img_id}",
-                                      img_id)
-        return img_id
+        async with self._uploading_ids_lock:
+            if img_id in self.uploading_ids or len(await self._db_context.validate_ids([str(img_id)])) != 0:
+                logger.warning("Duplicate upload request for image id: {}", img_id)
+                raise PointDuplicateError(
+                    f"The uploaded point is already contained in the database! entity id: {img_id}",
+                    img_id)
+            self.uploading_ids.add(img_id)
+            
+    async def try_remove_image_id(self, img_id: uuid.UUID):
+        async with self._uploading_ids_lock:
+            if img_id in self.uploading_ids:
+                self.uploading_ids.remove(img_id)
+            else:
+                logger.warning("Image id {} not found in uploading ids.", img_id)
 
     async def sync_upload_image(self, mapped_img: MappedImage, img_bytes: bytes, skip_ocr: bool,
                                 thumbnail_mode: UploadImageThumbnailMode):
