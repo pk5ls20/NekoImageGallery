@@ -33,7 +33,7 @@ class VectorDbContext(LifespanService):
             case QdrantMode.SERVER:
                 self._client = AsyncQdrantClient(host=config.qdrant.host, port=config.qdrant.port,
                                                  grpc_port=config.qdrant.grpc_port, api_key=config.qdrant.api_key,
-                                                 prefer_grpc=config.qdrant.prefer_grpc)
+                                                 prefer_grpc=config.qdrant.prefer_grpc, https=config.qdrant.https)
                 wrap_object(self._client, retry_async((AioRpcError, HTTPError)))
             case QdrantMode.LOCAL:
                 self._client = AsyncQdrantClient(path=config.qdrant.local_path)
