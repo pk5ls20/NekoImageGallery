@@ -23,6 +23,7 @@ class QdrantSettings(BaseModel):
     coll: str = 'NekoImg'
     prefer_grpc: bool = True
     api_key: str | None = None
+    https: bool | None = None
 
     local_path: str = './images_metadata'
 
